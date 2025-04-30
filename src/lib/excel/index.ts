@@ -1,16 +1,26 @@
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
-import ExcelJS, { Buffer, Column, Workbook, Worksheet } from 'exceljs';
-import { Response } from 'express';
-import { find, get, range, uniqBy } from 'lodash';
+import ExcelJS, {Buffer, Column, Workbook, Worksheet} from 'exceljs';
+import {Response} from 'express';
+import {find, get, range, uniqBy} from 'lodash';
 
-import { getResources } from '@controllers/add-ons/autocomplete/resource';
-import { currencyMoneyFormatter } from '@lib/excel/currency';
-import { ExcelData, ExcelOptions, FIELD_TYPE, HeaderMessage, Reference, Source, SourceParam, TemplateField, TemplateOptions } from '@lib/excel/type';
+import {getResources} from '@controllers/add-ons/autocomplete/resource';
+import {currencyMoneyFormatter} from '@lib/excel/currency';
+import {
+    ExcelData,
+    ExcelOptions,
+    FIELD_TYPE,
+    HeaderMessage,
+    Reference,
+    Source,
+    SourceParam,
+    TemplateField,
+    TemplateOptions
+} from '@lib/excel/type';
 import serviceClient from '@lib/service-client';
 import serviceClientV2 from '@lib/service-client-v2';
-import { getValueByPath } from '@lib/utils';
+import {getValueByPath} from '@lib/utils';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -21,16 +31,16 @@ const setRowStyle = (worksheet, headerMessage?: HeaderMessage) => {
 
     worksheet.eachRow((row, rowNumber) => {
         row.border = {
-            top: { style: 'thin', color: { argb: 'E5E5E8' } },
-            left: { style: 'thin', color: { argb: 'E5E5E8' } },
-            bottom: { style: 'thin', color: { argb: 'E5E5E8' } },
-            right: { style: 'thin', color: { argb: 'E5E5E8' } }
+            top: {style: 'thin', color: {argb: 'E5E5E8'}},
+            left: {style: 'thin', color: {argb: 'E5E5E8'}},
+            bottom: {style: 'thin', color: {argb: 'E5E5E8'}},
+            right: {style: 'thin', color: {argb: 'E5E5E8'}}
         };
         if (rowNumber > headerRowNumber && rowNumber % 2 === 0) {
             row.fill = {
                 type: 'pattern',
                 pattern: 'solid',
-                fgColor: { argb: 'F7F7F7' }
+                fgColor: {argb: 'F7F7F7'}
             };
         }
     });
@@ -41,7 +51,7 @@ const setColumnStyle = (worksheet, headerMessage?: HeaderMessage) => {
 
     worksheet.columns.forEach((column) => {
         let maxColumnLength = 0;
-        column.eachCell({ includeEmpty: true }, (cell, cellNumber) => {
+        column.eachCell({includeEmpty: true}, (cell, cellNumber) => {
             if (cellNumber >= headerRowNumber) {
                 maxColumnLength = Math.max(
                     maxColumnLength,
@@ -58,7 +68,7 @@ const setHeaderMessageStyle = (worksheet) => {
     worksheet.getCell(cellId).font = {
         bold: true,
         size: 22,
-        color: { argb: '003566' }
+        color: {argb: '003566'}
     };
     worksheet.getCell(cellId).alignment = {
         vertical: 'bottom',
@@ -78,13 +88,13 @@ const setHeaderStyle = (worksheet: Worksheet, headerRowNumber: number, columnLen
         const letter = `${convertNumToLetter(i)}${headerRowNumber}`;
         worksheet.getCell(letter).fill = {
             type: 'pattern',
-            pattern:'solid',
-            fgColor:{ argb: '003566' }
+            pattern: 'solid',
+            fgColor: {argb: '003566'}
         };
         worksheet.getCell(letter).font = {
             bold: true,
             size: 12,
-            color: { argb: 'FFFFFF' }
+            color: {argb: 'FFFFFF'}
         };
         worksheet.getCell(letter).alignment = {
             horizontal: 'left'
@@ -177,14 +187,14 @@ const convertReferenceToReferenceResource = (referenceResourceMap: ReferenceReso
     if (Array.isArray(cellData)) {
         convertedData = [];
         cellData.forEach((d) => {
-                // @ts-ignore
-            const selectedData: any = find(referenceResource, { key: d });
+            // @ts-ignore
+            const selectedData: any = find(referenceResource, {key: d});
             if (selectedData) convertedData.push(selectedData.name);
             else convertedData.push(d);
         });
     } else {
-            // @ts-ignore
-        convertedData = find(referenceResource, { key: cellData });
+        // @ts-ignore
+        convertedData = find(referenceResource, {key: cellData});
         if (convertedData) convertedData = convertedData.name;
         else convertedData = cellData;
     }
@@ -196,34 +206,34 @@ const formatData = (cellData, field: TemplateField, timezone: string): string =>
 
     if (cellData === null || cellData === undefined || Number.isNaN(cellData)) return '';
 
+    console.log("CellData Origin " + cellData)
+    console.log("CellData Type " + typeof cellData)
+
     let results = cellData;
 
     if (type === FIELD_TYPE.datetime) {
         if (cellData) {
             results = dayjs.tz(dayjs(cellData), timezone).format('YYYY-MM-DD HH:mm:ss');
         }
-    }
-
-    else if (type === FIELD_TYPE.currency) {
+    } else if (type === FIELD_TYPE.currency) {
         const currency = field.options?.currency;
         const currencyRates = field.options?.currencyRates;
         results = currencyMoneyFormatter(cellData, currency, currencyRates);
-    }
-
-    else if (type === FIELD_TYPE.enum) {
+    } else if (type === FIELD_TYPE.enum) {
         const enumItems = field.enum_items;
         if (enumItems) results = enumItems[cellData];
-    }
-
-    else if (Array.isArray(cellData)) {
+    } else if (Array.isArray(cellData)) {
+        console.log("CellData Origin " + cellData)
         results = '';
-            // @ts-ignore
+        // @ts-ignore
         cellData = uniqBy(cellData);
         cellData.filter(d => d !== null && d !== undefined && !Number.isNaN(d))
             .forEach((d, index) => {
                 if (index > 0) results += '\n';
                 results += JSON.parse(JSON.stringify(d));
             });
+        console.log("After filter : " + cellData)
+        console.log(results)
     }
     return results;
 };
@@ -250,7 +260,7 @@ const convertRawDataToExcelData = async (rawData, fields: TemplateField[], timez
     return results;
 };
 const setExcelCellRows = async (worksheet: Worksheet, source: Source, fields: TemplateField[], options: TemplateOptions, version = 'v1'): Promise<void> => {
-    const { url, param, data } = source;
+    const {url, param, data} = source;
     if (!data && !(url && param)) {
         throw new Error('Invalid Excel Options. (source = must have data key, or both url and param keys.)');
     }
@@ -264,7 +274,7 @@ const setExcelCellRows = async (worksheet: Worksheet, source: Source, fields: Te
     worksheet.addRows(excelData);
 };
 const setDataValidation = (worksheet: Worksheet, fields: TemplateField[]) => {
-    fields.forEach(({ type, enum_items }, fieldIdx) => {
+    fields.forEach(({type, enum_items}, fieldIdx) => {
         if (type === 'enum' && enum_items) {
             const columns = worksheet.columns[fieldIdx];
             if (columns?.eachCell) {
@@ -318,7 +328,7 @@ const createWorksheet = async (workbook: Workbook, excelOptions: ExcelOptions) =
 const getOutBuffer = async (workbook: Workbook): Promise<Buffer> => {
     return await workbook.xlsx.writeBuffer();
 };
-const getFileName = (excelOptions: ExcelOptions|ExcelOptions[]) => {
+const getFileName = (excelOptions: ExcelOptions | ExcelOptions[]) => {
     let timezone;
     let prefix;
     if (Array.isArray(excelOptions)) {
@@ -333,7 +343,7 @@ const getFileName = (excelOptions: ExcelOptions|ExcelOptions[]) => {
     return `${prefix}_${fileName}`;
 };
 
-export const createExcel = async (response: Response, excelOptions: ExcelOptions|ExcelOptions[]): Promise<Buffer> => {
+export const createExcel = async (response: Response, excelOptions: ExcelOptions | ExcelOptions[]): Promise<Buffer> => {
     const workbook: Workbook = new ExcelJS.Workbook();
     if (Array.isArray(excelOptions)) {
         await Promise.all(excelOptions.map((eachOpt) => createWorksheet(workbook, eachOpt)));
